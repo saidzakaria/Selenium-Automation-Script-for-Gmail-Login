@@ -1,18 +1,16 @@
 import pandas as pd
-from selenium import webdriver
+import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementNotInteractableException
 
 # Read the CSV file
-df = pd.read_csv('example.csv')
+df = pd.read_csv('CSD.csv')
 
-# Initialize the WebDriver
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+# Initialize the undetected Chrome WebDriver
+driver = uc.Chrome()
 
 def login(email, password):
     try:
@@ -29,21 +27,36 @@ def login(email, password):
         email_field.send_keys(email)
         email_field.send_keys(Keys.RETURN)
 
+        # Wait for the transition to the password input
+        WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.NAME, 'Passwd'))
+        )
+
         password_field = WebDriverWait(driver, 20).until(
             EC.visibility_of_element_located((By.NAME, 'Passwd'))
-        )
-        WebDriverWait(driver, 20).until(
-            EC.element_to_be_clickable((By.NAME, 'Passwd'))
         )
         password_field.send_keys(password)
         password_field.send_keys(Keys.RETURN)
 
+        # Check for successful login
         WebDriverWait(driver, 20).until(
             EC.url_contains("mail.google.com")
         )
         print(f"Logged in successfully with {email}")
+
     except (TimeoutException, NoSuchElementException, ElementNotInteractableException) as e:
-        print(f"Failed to log in with {email}. Password might be incorrect or element not interactable.")
+        print(f"Failed to log in with {email}. Error: {e}")
+        # Optional: Print page source or take a screenshot for debugging
+        with open(f"page_source_{email}.html", "w", encoding="utf-8") as f:
+            f.write(driver.page_source)
+        driver.save_screenshot(f"screenshot_{email}.png")
+    
+    finally:
+        # Close the tab
+        driver.close()
+        # Switch back to the first tab
+        if len(driver.window_handles) > 0:
+            driver.switch_to.window(driver.window_handles[0])
 
 for index, row in df.iterrows():
     login(row['Email'], row['Password'])
